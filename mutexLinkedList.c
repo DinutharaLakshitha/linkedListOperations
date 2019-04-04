@@ -1,8 +1,8 @@
 /*
  * Linked List with a single mutex for the whole list
  *
- * Compile : gcc -g -Wall -o mutex_linked_list mutex_linked_list.c
- * Run : ./mutex_linked_list <n> <m> <mMember> <mInsert> <mDelete>
+ * Compile : gcc -g -Wall -o mutexLinkedList mutexLinkedList.c
+ * Run : ./mutexLinkedList <n> <m> <mMember> <mInsert> <mDelete>
  *
  * */
 #include<stdio.h>
