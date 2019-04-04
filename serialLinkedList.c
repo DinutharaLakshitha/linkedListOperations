@@ -1,8 +1,8 @@
 /*
  * Serial Linked List
  *
- * Compile : gcc -g -Wall -o serial_linked_list serial_linked_list.c
- * Run : ./serial_linked_list <n> <m> <mMember> <mInsert> <mDelete>
+ * Compile : gcc -g -Wall -o serialLinkedList.c -pthread
+ * Run : ./serialLinkedList <n> <m> <mMember> <mInsert> <mDelete>
  *
  * */
 #include<stdio.h>
@@ -10,6 +10,7 @@
 #include <sys/time.h>
 
 #define MAX_RANDOM 65535
+#define MAX_RANDOM_STR "65535"
 
 // Number of nodes in the linked list
 int n = 0;
@@ -42,10 +43,9 @@ int main(int argc, char *argv[]) {
     struct list_node_s *head = NULL;
     struct timeval time_begin, time_end;
 
-    //Getting the inputs
     getInput(argc, argv);
 
-    //Linked List Generation with Random values
+    //Generate linked list with n nodes
     int i = 0;
     while (i < n) {
         if (Insert(rand() % MAX_RANDOM, &head) == 1)
@@ -159,10 +159,10 @@ int Delete(int value, struct list_node_s **head_pp) {
         return 0;
 }
 
-//Getting the inputs
+//Read required params
 void getInput(int argc, char *argv[]) {
     if (argc != 6) {
-        printf("Please give the command: ./serial_linked_list <n> <m> <mMember> <mInsert> <mDelete>\n");
+        printf("Run file as : ./serial_linked_list <n> <m> <mMember> <mInsert> <mDelete>\n");
         exit(0);
     }
 
@@ -172,21 +172,18 @@ void getInput(int argc, char *argv[]) {
     m_member_frac = (float) atof(argv[3]);
     m_insert_frac = (float) atof(argv[4]);
     m_delete_frac = (float) atof(argv[5]);
-
-    //Validating the arguments
-    if (n <= 0 || m <= 0 || m_member_frac + m_insert_frac + m_delete_frac != 1.0) {
-        printf("Please give the command with the arguements: ./serial_linked_list <n> <m> <mMember> <mInsert> <mDelete>\n");
-
-        if (n <= 0)
-            printf("Please provide a valid number of nodes for the linked list (value of n)\n");
-
-        if (m <= 0)
-            printf("Please provide a valid number of operations for the linked list (value of m)\n");
-
-        if (m_member_frac + m_insert_frac + m_delete_frac != 1.0)
-            printf("Please provide valid fractions of operations for the linked list (value of mMember, mInsert, mDelete)\n");
-
+        
+    if (n <= 0 || n> MAX_RANDOM){
+        printf("Provide n between 0-"MAX_RANDOM_STR"\n");
         exit(0);
+    }
+    if (m <= 0 || m> MAX_RANDOM){
+        printf("Provide m between 0-"MAX_RANDOM_STR"\n");
+        exit(0);
+    }
+    if (m_member_frac + m_insert_frac + m_delete_frac != 1.0){
+        printf("Provide valid values for mMember, mInsert, mDelete\n");
+        exit(0);       
     }
 }
 
