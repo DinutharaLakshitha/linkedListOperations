@@ -12,6 +12,7 @@
 
 #define MAX_THREADS 1024
 #define MAX_RANDOM 65535
+#define MAX_RANDOM_STR "65535"
 
 // Count variables to store each thread operation execution times
 int count_member = 0;

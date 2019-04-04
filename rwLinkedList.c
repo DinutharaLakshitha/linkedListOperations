@@ -12,6 +12,7 @@
 
 #define MAX_THREADS 1024
 #define MAX_RANDOM 65535
+#define MAX_RANDOM_STR "65535"
 
 // Number of nodes in the linked list
 int n = 0;
@@ -196,19 +197,17 @@ void getInput(int argc, char *argv[]) {
     }
 
     //Validating the arguments
-    if (n <= 0 || m <= 0 || m_member_frac + m_insert_frac + m_delete_frac != 1.0) {
-        printf("Please give the command with the arguements: ./serial_linked_list <n> <m> <mMember> <mInsert> <mDelete>\n");
-
-        if (n <= 0)
-            printf("Please provide a valid number of nodes for the linked list (value of n)\n");
-
-        if (m <= 0)
-            printf("Please provide a valid number of operations for the linked list (value of m)\n");
-
-        if (m_member_frac + m_insert_frac + m_delete_frac != 1.0)
-            printf("Please provide valid fractions of operations for the linked list (value of mMember, mInsert, mDelete)\n");
-
+    if (n <= 0 || n> MAX_RANDOM){
+        printf("Provide n between 0-"MAX_RANDOM_STR"\n");
         exit(0);
+    }
+    if (m <= 0 || m> MAX_RANDOM){
+        printf("Provide m between 0-"MAX_RANDOM_STR"\n");
+        exit(0);
+    }
+    if (m_member_frac + m_insert_frac + m_delete_frac != 1.0){
+        printf("Provide valid values for mMember, mInsert, mDelete\n");
+        exit(0);       
     }
 }
 
