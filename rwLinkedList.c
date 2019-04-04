@@ -1,8 +1,8 @@
 /*
- * Linked List with a single mutex for the whole list
+ * Linked List with read write lock
  *
- * Compile : gcc -g -Wall -o mutexLinkedList mutexLinkedList.c
- * Run : ./mutexLinkedList <n> <m> <mMember> <mInsert> <mDelete>
+ * Compile : gcc -g -Wall -o rwLinkedList rw_linked_list.c
+ * Run : ./rwLinkedList <n> <m> <mMember> <mInsert> <mDelete>
  *
  * */
 #include<stdio.h>
@@ -12,11 +12,6 @@
 
 #define MAX_THREADS 1024
 #define MAX_RANDOM 65535
-
-// Count variables to store each thread operation execution times
-int count_member = 0;
-int count_insert = 0;
-int count_delete = 0;
 
 // Number of nodes in the linked list
 int n = 0;
@@ -31,12 +26,12 @@ int thread_count = 0;
 float m_insert_frac = 0.0, m_delete_frac = 0.0, m_member_frac = 0.0;
 
 // Total number of each operation
-float m_insert = 0.0, m_delete = 0.0, m_member = 0.0;
+int m_insert = 0, m_delete = 0, m_member = 0;
 
 struct list_node_s *head = NULL;
-pthread_mutex_t mutex;
+pthread_rwlock_t rwlock;
 
-// Node definition
+//Node definition
 struct list_node_s {
     int data;
     struct list_node_s *next;
@@ -48,12 +43,11 @@ int Delete(int value, struct list_node_s **head_pp);
 
 int Member(int value, struct list_node_s *head_p);
 
-double CalcTime(struct timeval time_begin, struct timeval time_end);
-
 void getInput(int argc, char *argv[]);
 
-void *Thread_Operation();
+double CalcTime(struct timeval time_begin, struct timeval time_end);
 
+void *Thread_Operation(void *id);
 
 int main(int argc, char *argv[]) {
 
@@ -61,15 +55,17 @@ int main(int argc, char *argv[]) {
     getInput(argc, argv);
 
     pthread_t *thread_handlers;
-    thread_handlers = malloc(sizeof(pthread_t) * thread_count);
+    thread_handlers = (pthread_t*)malloc(sizeof(pthread_t) * thread_count);
 
     // time variables
     struct timeval time_begin, time_end;
 
-    // Calculating the total number od each operation
-    m_insert = m_insert_frac * m;
-    m_delete = m_delete_frac * m;
-    m_member = m_member_frac * m;
+    int *thread_id;
+    thread_id = (int *)malloc(sizeof(int) * thread_count);
+
+    m_insert = (int) (m_insert_frac * m);
+    m_delete = (int) (m_delete_frac * m);
+    m_member = (int) (m_member_frac * m);
 
     // Linked List Generation with Random values
     int i = 0;
@@ -78,16 +74,14 @@ int main(int argc, char *argv[]) {
             i++;
     }
 
-    // Initializing the mutex
-    pthread_mutex_init(&mutex, NULL);
-
-    // Getting the begin time stamp
+    pthread_rwlock_init(&rwlock, NULL);
     gettimeofday(&time_begin, NULL);
 
     // Thread Creation
     i = 0;
     while (i < thread_count) {
-        pthread_create(&thread_handlers[i], NULL, (void *) Thread_Operation, NULL);
+        thread_id[i] = i;
+        pthread_create(&thread_handlers[i], NULL, (void *) Thread_Operation, (void *) &thread_id[i]);
         i++;
     }
 
@@ -97,14 +91,10 @@ int main(int argc, char *argv[]) {
         pthread_join(thread_handlers[i], NULL);
         i++;
     }
-
-    // Getting the end time stamp
     gettimeofday(&time_end, NULL);
+    pthread_rwlock_destroy(&rwlock);
 
-    // Destroying the mutex
-    pthread_mutex_destroy(&mutex);
-
-    printf("Linked List with a single mutex Time Spent : %.6f secs\n", CalcTime(time_begin, time_end));
+    printf("Linked List with read write locks Time Spent : %.6f\n", CalcTime(time_begin, time_end));
 
     return 0;
 }
@@ -174,17 +164,18 @@ int Delete(int value, struct list_node_s **head_pp) {
         }
 
         return 1;
+
     }
     else
         return 0;
 }
 
-//Getting the inputs
+// Getting the inputs
 void getInput(int argc, char *argv[]) {
 
     // Validating the number of arguements
     if (argc != 7) {
-        printf("Please give the command: ./mutexLinkedList <n> <m> <thread_count> <mMember> <mInsert> <mDelete>\n");
+        printf("Please give the command: ./rwLinkedList <n> <m> <thread_count> <mMember> <mInsert> <mDelete>\n");
         exit(0);
     }
 
@@ -205,81 +196,113 @@ void getInput(int argc, char *argv[]) {
     }
 
     //Validating the arguments
-    if (n <= 0 || n> MAX_RANDOM){
-        printf("Provide n between 0-"MAX_RANDOM_STR"\n");
+    if (n <= 0 || m <= 0 || m_member_frac + m_insert_frac + m_delete_frac != 1.0) {
+        printf("Please give the command with the arguements: ./serial_linked_list <n> <m> <mMember> <mInsert> <mDelete>\n");
+
+        if (n <= 0)
+            printf("Please provide a valid number of nodes for the linked list (value of n)\n");
+
+        if (m <= 0)
+            printf("Please provide a valid number of operations for the linked list (value of m)\n");
+
+        if (m_member_frac + m_insert_frac + m_delete_frac != 1.0)
+            printf("Please provide valid fractions of operations for the linked list (value of mMember, mInsert, mDelete)\n");
+
         exit(0);
-    }
-    if (m <= 0 || m> MAX_RANDOM){
-        printf("Provide m between 0-"MAX_RANDOM_STR"\n");
-        exit(0);
-    }
-    if (m_member_frac + m_insert_frac + m_delete_frac != 1.0){
-        printf("Provide valid values for mMember, mInsert, mDelete\n");
-        exit(0);       
     }
 }
 
 // Thread Operations
-void *Thread_Operation() {
+void *Thread_Operation(void *thread_id) {
+
+    int local_m = 0;
+    int local_m_insert = 0;
+    int local_m_delete = 0;
+    int local_m_member = 0;
+
+    int id = *(int *)thread_id;
+
+    // Generate local no of insertion operations without loss
+    if (m_insert % thread_count == 0 || m_insert % thread_count <= id) {
+        local_m_insert = m_insert / thread_count;
+    }
+    else if (m_insert % thread_count > id) {
+        local_m_insert = m_insert / thread_count + 1;
+    }
+
+    // Generate local no of member operations without loss
+    if (m_member % thread_count == 0 || m_member % thread_count <= id) {
+        local_m_member = m_member / thread_count;
+    }
+    else if (m_member % thread_count > id) {
+        local_m_member = m_member / thread_count + 1;
+    }
+
+    // Generate local no of deletion operations without loss
+    if (m_delete % thread_count == 0 || m_delete % thread_count <= id) {
+        local_m_delete = m_delete / thread_count;
+    }
+    else if (m_delete % thread_count > id) {
+        local_m_delete = m_delete / thread_count + 1;
+    }
+
+    local_m = local_m_insert + local_m_delete + local_m_member;
 
     int count_tot = 0;
+    int count_member = 0;
+    int count_insert = 0;
+    int count_delete = 0;
 
     int finished_member = 0;
     int finished_insert = 0;
     int delete_finished = 0;
 
-    while (count_tot < m) {
+    int i = 0;
+    while (count_tot < local_m) {
 
-        // Variable to randomly generate values for operations
         int random_value = rand() % MAX_RANDOM;
-
-        // Variable to randomly select one of the three operations
         int random_select = rand() % 3;
 
         // Member operation
         if (random_select == 0 && finished_member == 0) {
-
-            pthread_mutex_lock(&mutex);
-            if (count_member < m_member) {
+            if (count_member < local_m_member) {
+                pthread_rwlock_rdlock(&rwlock);
                 Member(random_value, head);
+                pthread_rwlock_unlock(&rwlock);
                 count_member++;
-            }else
-                finished_member =1;
-            pthread_mutex_unlock(&mutex);
+            } else
+                finished_member = 1;
         }
 
-        // Insert Operation
-        if (random_select == 1 && finished_insert == 0) {
-
-            pthread_mutex_lock(&mutex);
-            if (count_insert < m_insert) {
+            // Insert Operation
+        else if (random_select == 1 && finished_insert == 0) {
+            if (count_insert < local_m_insert) {
+                pthread_rwlock_wrlock(&rwlock);
                 Insert(random_value, &head);
+                pthread_rwlock_unlock(&rwlock);
                 count_insert++;
-            }else
-                finished_insert =1;
-            pthread_mutex_unlock(&mutex);
+            } else
+                finished_insert = 1;
         }
 
-        // Delete Operation
+            // Delete Operation
         else if (random_select == 2 && delete_finished == 0) {
 
-            pthread_mutex_lock(&mutex);
-            if (count_delete < m_delete) {
+            if (count_delete < local_m_delete) {
+                pthread_rwlock_wrlock(&rwlock);
                 Delete(random_value, &head);
+                pthread_rwlock_unlock(&rwlock);
                 count_delete++;
-            }else
-                delete_finished =1;
-            pthread_mutex_unlock(&mutex);
+            } else
+                delete_finished = 1;
         }
-
-        // Updating the count
         count_tot = count_insert + count_member + count_delete;
+        i++;
     }
     return NULL;
 }
 
 // Calculating time
 double CalcTime(struct timeval time_begin, struct timeval time_end) {
-
     return (double) (time_end.tv_usec - time_begin.tv_usec) / 1000000 + (double) (time_end.tv_sec - time_begin.tv_sec);
 }
